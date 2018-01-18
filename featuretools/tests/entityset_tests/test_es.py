@@ -58,7 +58,8 @@ def test_get_backward_entities(es):
 
 def test_get_forward_entities_deep(es):
     entities = es.get_forward_entities('log', 'deep')
-    assert entities == set(['sessions', 'customers', 'products', 'regions', 'cohorts'])
+    assert entities == set(
+        ['sessions', 'customers', 'products', 'regions', 'cohorts'])
 
 
 def test_get_backward_entities_deep(es):
@@ -135,23 +136,6 @@ def test_add_parent_not_index_varible(es):
     with pytest.raises(AttributeError):
         es.add_relationship(Relationship(es['regions']['language'],
                                          es['customers']['region_id']))
-
-# def test_glob_entityset(es, glob_es):
-#     df_1 = es.entity_stores['log'].df
-#     df_2 = glob_es.entity_stores['log'].df
-#     assert df_1.equals(df_2)
-
-
-# def test_gzip_entityset(es, gzip_es):
-#     df_1 = es.entity_stores['log'].df
-#     df_2 = gzip_es.entity_stores['log'].df
-#     assert df_1.equals(df_2)
-
-
-# def test_gzip_glob_entityset(es, gzip_glob_es):
-#     df_1 = es.entity_stores['log'].df
-#     df_2 = gzip_glob_es.entity_stores['log'].df
-#     assert df_1.equals(df_2)
 
 
 def test_serialization(es):

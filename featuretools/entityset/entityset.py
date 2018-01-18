@@ -4,7 +4,6 @@ import logging
 from builtins import range, zip
 from collections import defaultdict
 
-import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 
@@ -299,7 +298,8 @@ class EntitySet(BaseEntitySet):
         """
         Add variable to entity's dataframe
         """
-        self.entity_stores[entity_id].add_column(column_id, column_data, type=type)
+        self.entity_stores[entity_id].add_column(
+            column_id, column_data, type=type)
 
     def delete_column(self, entity_id, column_id):
         """
@@ -312,146 +312,14 @@ class EntitySet(BaseEntitySet):
         Convert variable in data set to different type
         """
         # _operations?
-        self.entity_stores[entity_id].convert_variable_type(column_id, new_type, **kwargs)
+        self.entity_stores[entity_id].convert_variable_type(
+            column_id, new_type, **kwargs)
 
     # Read-write entity-level methods
 
     ###########################################################################
     #  Entity creation methods  ##############################################
     ###########################################################################
-    def entity_from_csv(self, entity_id,
-                        csv_path,
-                        index=None,
-                        variable_types=None,
-                        use_variables=None,
-                        make_index=False,
-                        time_index=None,
-                        secondary_time_index=None,
-                        time_index_components=None,
-                        parse_date_cols=None,
-                        encoding=None,
-                        **kwargs):
-        """
-        Load the data for a specified entity from a CSV file.
-        WARNING: Depreciated. Use pd.read_csv and entity_from_dataframe instead
-
-        Args:
-            entity_id (str) : unique id to associate with this entity
-
-            csv_path (str) : path to the file containing the data
-
-            index (str, optional): Name of the variable used to index the entity.
-                If None, take the first column
-
-            variable_types (dict[str->dict[str->type]]) : Optional mapping of
-                entity_id -> variable_types dict with which to initialize an
-                entity's store.
-                An entity's variable_types dict maps string variable ids to types (:class:`.Variable`)
-
-            use_variables (Optional(list[str])) : List of column names to pull from csv
-
-            make_index (Optional(boolean)) : If True, assume index does not exist as a column in
-                csv, and create a new column of that name using integers the (0, len(dataframe)).
-                Otherwise, assume index exists in csv
-
-            time_index (Optional[str]): Name of the variable containing
-                time data. Type must be in Variables.datetime or be able to be
-                cast to datetime (e.g. str, float), or numeric.
-
-            secondary_time_index (Optional[str]): Name of variable containing
-                time data to use a second time index for the entity
-
-            time_index_components (Optional((list[str])) : Names of columns to combine (separated by spaces)
-                and allow Pandas to parse as a single Datetime time_index column. Columns are
-                combined in the order provided. Useful if there are separate date and time
-                columns (e.g. col1[0] = '8/8/2016' and col2[0] = '4:30')
-
-            parse_date_cols (Optional(list[str])) : list of column names to parse as datetimes
-
-            encoding (Optional(str)) : If None, will use 'ascii'. Another option is 'utf-8',
-                or any encoding supported by pandas. Passed into underlying
-                pandas.read_csv() and pandas.to_csv() calls, so see Pandas documentation
-                for more information
-
-            **kwargs : Extra arguments will be passed to :func:`pd.read_csv`
-        """
-
-        # If time index components are passed, combine them into a single column
-        # TODO look into handling secondary_time_index here
-
-        # _operations?
-        logger.warning(("EntitySet.from_csv will be depreciated in v0.1.18",
-                        "Use pd.read_csv and EntitySet.from_dataframe instead"))
-        if parse_date_cols:
-            parse_date_cols = parse_date_cols or []
-
-        def load_df(e, csv_path):
-            ext = csv_path.split('.')[-1]
-            compression = None
-            compression_formats = ['bz2', 'gzip']
-            if ext in compression_formats:
-                compression = ext
-            elif ext != 'csv':
-                raise ValueError("Unknown extension: %s", ext)
-
-            read_csv = pd.read_csv
-            glob = False
-
-            if "*" in csv_path:
-                glob = True
-                # read dask dataframe from multiple files
-                read_csv = dd.read_csv
-                kwargs['blocksize'] = None
-
-            if time_index_components:
-                parse_dates = {time_index: time_index_components}
-                df = read_csv(csv_path, low_memory=False,
-                              parse_dates=parse_dates,
-                              compression=compression,
-                              usecols=use_variables,
-                              encoding=encoding,
-                              **kwargs)
-            else:
-                df = read_csv(csv_path, low_memory=False,
-                              parse_dates=parse_date_cols,
-                              compression=compression,
-                              usecols=use_variables,
-                              encoding=encoding,
-                              **kwargs)
-
-            if glob:
-                # convert dask dataframe back to pandas
-                if e:
-                    df = e.compute(df)
-                else:
-                    df = df.compute()
-            return df
-
-        # handle if we are working list of csv_path
-        # TODO: handle multiple csvs using dask so that they will be downloaded in parallel
-        dfs = []
-        if not isinstance(csv_path, list):
-            csv_path = [csv_path]
-
-        # DFS todo: what about
-        # # try:
-        #         with worker_client() as e:
-        #             df = load_df(e, csv)
-        #     except AttributeError:
-        for csv in csv_path:
-            df = load_df(None, csv)
-            dfs.append(df)
-
-        df = pd.concat(dfs)
-
-        return self._import_from_dataframe(entity_id, df, index=index,
-                                           make_index=make_index,
-                                           time_index=time_index,
-                                           secondary_time_index=secondary_time_index,
-                                           variable_types=variable_types,
-                                           parse_date_cols=parse_date_cols,
-                                           encoding=encoding)
-
     def entity_from_dataframe(self,
                               entity_id,
                               dataframe,
@@ -586,7 +454,8 @@ class EntitySet(BaseEntitySet):
                 logger.warning("index %s not found in dataframe, creating new integer column",
                                index)
             if index in dataframe.columns:
-                raise RuntimeError("Cannot make index: index variable already present")
+                raise RuntimeError(
+                    "Cannot make index: index variable already present")
             dataframe.insert(0, index, range(0, len(dataframe)))
             created_index = index
         elif index is None:
@@ -704,7 +573,8 @@ class EntitySet(BaseEntitySet):
         copy_variables = copy_variables or []
         for v in additional_variables + copy_variables:
             if v == index:
-                raise ValueError("Not copying {} as both index and variable".format(v))
+                raise ValueError(
+                    "Not copying {} as both index and variable".format(v))
                 break
         new_index = index
 
@@ -728,7 +598,8 @@ class EntitySet(BaseEntitySet):
         elif make_time_index:
             base_time_index = base_entity.time_index
             if new_entity_time_index is None:
-                new_entity_time_index = "%s_%s_time" % (time_index_reduce, base_entity.id)
+                new_entity_time_index = "%s_%s_time" % (
+                    time_index_reduce, base_entity.id)
 
             assert base_entity.has_time_index(), \
                 "Base entity doesn't have time_index defined"
@@ -736,9 +607,11 @@ class EntitySet(BaseEntitySet):
             if base_time_index not in [v for v in additional_variables]:
                 copy_variables.append(base_time_index)
 
-            transfer_types[new_entity_time_index] = type(base_entity[base_entity.time_index])
+            transfer_types[new_entity_time_index] = type(
+                base_entity[base_entity.time_index])
 
-            new_entity_df.sort_values([base_time_index, base_entity.index], kind="mergesort", inplace=True)
+            new_entity_df.sort_values(
+                [base_time_index, base_entity.index], kind="mergesort", inplace=True)
         else:
             new_entity_time_index = None
 
@@ -750,14 +623,17 @@ class EntitySet(BaseEntitySet):
             drop_duplicates(index, keep=time_index_reduce)[selected_variables]
 
         if make_time_index:
-            new_entity_df2.rename(columns={base_time_index: new_entity_time_index}, inplace=True)
+            new_entity_df2.rename(
+                columns={base_time_index: new_entity_time_index}, inplace=True)
         if make_secondary_time_index:
             time_index_reduce = 'first'
 
-            assert len(make_secondary_time_index) == 1, "Can only provide 1 secondary time index"
+            assert len(
+                make_secondary_time_index) == 1, "Can only provide 1 secondary time index"
             secondary_time_index = list(make_secondary_time_index.keys())[0]
 
-            secondary_variables = [index, secondary_time_index] + list(make_secondary_time_index.values())[0]
+            secondary_variables = [index, secondary_time_index] + \
+                list(make_secondary_time_index.values())[0]
             secondary_df = new_entity_df. \
                 drop_duplicates(index, keep='last')[secondary_variables]
             if new_entity_secondary_time_index:
@@ -775,7 +651,8 @@ class EntitySet(BaseEntitySet):
         if convert_links_to_integers:
             old_entity_df = self.get_dataframe(base_entity_id)
             link_variable_id = self.make_index_variable_name(new_entity_id)
-            new_entity_df[link_variable_id] = np.arange(0, new_entity_df.shape[0])
+            new_entity_df[link_variable_id] = np.arange(
+                0, new_entity_df.shape[0])
             just_index = old_entity_df[[index]]
             id_as_int = just_index.merge(new_entity_df,
                                          left_on=index,
@@ -809,13 +686,16 @@ class EntitySet(BaseEntitySet):
         if make_secondary_time_index:
             old_ti_name = list(make_secondary_time_index.keys())[0]
             ti_cols = list(make_secondary_time_index.values())[0]
-            ti_cols = [c if c != old_ti_name else secondary_time_index for c in ti_cols]
+            ti_cols = [
+                c if c != old_ti_name else secondary_time_index for c in ti_cols]
             new_dict = {secondary_time_index: ti_cols}
             new_entity.secondary_time_index = new_dict
 
-        base_entity.convert_variable_type(base_entity_index, vtypes.Id, convert_data=False)
+        base_entity.convert_variable_type(
+            base_entity_index, vtypes.Id, convert_data=False)
 
-        self.add_relationship(Relationship(new_entity[index], base_entity[base_entity_index]))
+        self.add_relationship(Relationship(
+            new_entity[index], base_entity[base_entity_index]))
 
         return self
 
@@ -838,7 +718,8 @@ class EntitySet(BaseEntitySet):
                                                             "you must specify which variable to use")
         msg = ("parent time index variable must be ",
                "a Datetime, Numeric, or Ordinal")
-        assert isinstance(parent_entity[parent_time_index_variable], (vtypes.Numeric, vtypes.Ordinal, vtypes.Datetime)), msg
+        assert isinstance(parent_entity[parent_time_index_variable],
+                          (vtypes.Numeric, vtypes.Ordinal, vtypes.Datetime)), msg
 
         self._add_parent_variable_to_df(entity_id, parent_entity_id,
                                         parent_time_index_variable,
@@ -847,8 +728,10 @@ class EntitySet(BaseEntitySet):
         if include_secondary_time_index:
             msg = "Parent entity has no secondary time index"
             assert len(parent_entity.secondary_time_index), msg
-            parent_sec_ti_id = list(parent_entity.secondary_time_index.keys())[0]
-            parent_sec_ti_vars = list(parent_entity.secondary_time_index.values())[0]
+            parent_sec_ti_id = list(
+                parent_entity.secondary_time_index.keys())[0]
+            parent_sec_ti_vars = list(
+                parent_entity.secondary_time_index.values())[0]
             if isinstance(secondary_time_index_variables, list):
                 parent_sec_ti_vars = [v for v in parent_sec_ti_vars
                                       if v in secondary_time_index_variables]
@@ -870,12 +753,14 @@ class EntitySet(BaseEntitySet):
         path = self.find_forward_path(child_entity_id, parent_entity_id)
         assert len(path) > 0, "must be a parent entity"
         if len(path) > 1:
-            raise NotImplementedError("adding time index from a grandparent not yet supported")
+            raise NotImplementedError(
+                "adding time index from a grandparent not yet supported")
         rel = path[0]
 
         child_data = entity.df
         # get columns of parent that we need and rename in prep for merge
-        parent_data = self.entity_stores[parent_entity_id].df[[rel.parent_variable.id, parent_variable_id]]
+        parent_data = self.entity_stores[parent_entity_id].df[[
+            rel.parent_variable.id, parent_variable_id]]
         col_map = {parent_variable_id: child_variable_id}
         parent_data.rename(columns=col_map, inplace=True)
 
@@ -923,10 +808,12 @@ class EntitySet(BaseEntitySet):
         new_data = None
         for v in to_combine:
             if new_data is None:
-                new_data = df[v.id].map(lambda x: (str(x) if isinstance(x, (int, float)) else x).encode('utf-8'))
+                new_data = df[v.id].map(lambda x: (
+                    str(x) if isinstance(x, (int, float)) else x).encode('utf-8'))
                 continue
             new_data += "_".encode('utf-8')
-            new_data += df[v.id].map(lambda x: (str(x) if isinstance(x, (int, float)) else x).encode('utf-8'))
+            new_data += df[v.id].map(lambda x: (str(x)
+                                                if isinstance(x, (int, float)) else x).encode('utf-8'))
 
         if hashed:
             new_data = new_data.map(hash)
@@ -1084,7 +971,8 @@ class EntitySet(BaseEntitySet):
         """
         # _operations?
         for entity in self.entities:
-            entity.add_interesting_values(max_values=max_values, verbose=verbose)
+            entity.add_interesting_values(
+                max_values=max_values, verbose=verbose)
 
     ###########################################################################
     #  Private methods  ######################################################
@@ -1250,7 +1138,8 @@ class EntitySet(BaseEntitySet):
                     # original parent's id.
                     col_map = {r.parent_variable.id: r.child_variable.id,
                                parent_link_name: child_link_name}
-                    merge_df = parent_df[list(col_map.keys())].rename(columns=col_map)
+                    merge_df = parent_df[list(col_map.keys())].rename(
+                        columns=col_map)
 
                     # merge the dataframe, adding the link variable to the child
                     frames[child_entity.id] = pd.merge(left=merge_df,
